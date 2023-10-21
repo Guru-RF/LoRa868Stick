@@ -167,7 +167,6 @@ while True:
                             print(packet)
                             sendSerial(packet[3:])
                             sendSerial(b'\r\n')
-                    sendSerial(b'\r\n')
                     msg = yellow("nothing ;(")
                     sendSerial(msg.encode('ascii'))
                     sendSerial(b'\r\n')
@@ -243,7 +242,7 @@ while True:
                             sendSerial(packet[3:])
                             sendSerial(b'\r\n')
                     sendSerial(b'#rx#done\r\n')
-                    lInLED.value = True
+                    lInLED.value = False
             else:
                 sendSerial(b'Unknown message !! CTRL + ] Gives CLI promt.\r\n')
                 sendSerial(b'#sw#<msg> for direct msg to switches.\r\n')
