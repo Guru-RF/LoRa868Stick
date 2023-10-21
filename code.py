@@ -161,12 +161,12 @@ while True:
                     packet = "ok"
                     while packet is not None:
                         packet = rfm9x.receive(with_header=True,timeout=listentime)
-                        lInLED.value = True
                         if packet is not None:
                             print("RAW Packet:")
                             print(packet)
                             sendSerial(packet[3:])
                             sendSerial(b'\r\n')
+                    lInLED.value = True
                     msg = yellow("nothing ;(")
                     sendSerial(msg.encode('ascii'))
                     sendSerial(b'\r\n')
@@ -231,18 +231,17 @@ while True:
                     sendSerial(b'#sw#done\r\n')
                 if data[:3] == "rx#":
                     data = data[3:]
-                    lOutLED.value = False
                     packet = "ok"
+                    lInLED.value = False
                     while packet is not None:
                         packet = rfm9x.receive(with_header=True,timeout=int(data))
-                        lInLED.value = True
                         if packet is not None:
                             print("RAW Packet:")
                             print(packet)
                             sendSerial(packet[3:])
                             sendSerial(b'\r\n')
                     sendSerial(b'#rx#done\r\n')
-                    lInLED.value = False
+                    lInLED.value = True
             else:
                 sendSerial(b'Unknown message !! CTRL + ] Gives CLI promt.\r\n')
                 sendSerial(b'#sw#<msg> for direct msg to switches.\r\n')
