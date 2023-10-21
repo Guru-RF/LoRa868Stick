@@ -157,15 +157,15 @@ while True:
                     msg = yellow("Waiting for LoRa packets for " + str(listentime) + " seconds ...")
                     sendSerial(msg.encode('ascii'))
                     sendSerial(b'\r\n')
-                    sendSerial(b'<...>')
                     lInLED.value = False
                     packet = "ok"
                     while packet is not None:
                         packet = rfm9x.receive(with_header=True,timeout=listentime)
                         lInLED.value = True
                         if packet is not None:
-                            sendSerial(b'\r\n')
-                            sendSerial(packet)
+                            print("RAW Packet:")
+                            print(packet)
+                            sendSerial(packet[3:])
                             sendSerial(b'\r\n')
                     sendSerial(b'\r\n')
                     msg = yellow("nothing ;(")
@@ -194,7 +194,7 @@ while True:
                         sendSerial(b'>')
                         data = ""
                     else:
-                        msg = yellow("Sending in " + modetype + " mode: >" + data)
+                        msg = yellow("TX>" + data)
                         sendSerial(b'\r')
                         sendSerial(msg.encode('ascii'))
                         sendSerial(b'\r\n')
@@ -217,7 +217,37 @@ while True:
                     sendSerial(modetype.encode('utf8'))
                     sendSerial(b'>')
         else:
-            sendSerial(b'Unknown message !! CTRL-] Gives CLI promt.\r\n')
+            if data[:1] == "#":
+                data = data[1:]
+                if data[:3] == "sw#":
+                    data = data[3:]
+                    lOutLED.value = False
+                    msg = yellow("TX>" + data)
+                    print(msg)
+                    rfm9x.send(
+                        bytes("{}".format("<"), "UTF-8") + binascii.unhexlify("AA") + binascii.unhexlify("01") +
+                        bytes("{}".format(data), "UTF-8")
+                    )
+                    lOutLED.value = True
+                    sendSerial(b'#sw#done\r\n')
+                if data[:3] == "rx#":
+                    data = data[3:]
+                    lOutLED.value = False
+                    packet = "ok"
+                    while packet is not None:
+                        packet = rfm9x.receive(with_header=True,timeout=int(data))
+                        lInLED.value = True
+                        if packet is not None:
+                            print("RAW Packet:")
+                            print(packet)
+                            sendSerial(packet[3:])
+                            sendSerial(b'\r\n')
+                    sendSerial(b'#rx#done\r\n')
+                    lInLED.value = True
+            else:
+                sendSerial(b'Unknown message !! CTRL + ] Gives CLI promt.\r\n')
+                sendSerial(b'#sw#<msg> for direct msg to switches.\r\n')
+                sendSerial(b'#rx#<time> receive lora msgs.\r\n')
 
         lastdata = data
         string = ""
