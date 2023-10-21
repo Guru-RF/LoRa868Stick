@@ -19,6 +19,14 @@ sOutLED = digitalio.DigitalInOut(board.GP25)
 sOutLED.direction = digitalio.Direction.OUTPUT
 sOutLED.value = True
 
+lOutLED = digitalio.DigitalInOut(board.GP24)
+lOutLED.direction = digitalio.Direction.OUTPUT
+lOutLED.value = True
+
+lInLED = digitalio.DigitalInOut(board.GP13)
+lInLED.direction = digitalio.Direction.OUTPUT
+lInLED.value = True
+
 def yellow(data):
   return "\x1b[38;5;220m" + data + "\x1b[0m"
 
@@ -105,7 +113,13 @@ while True:
         data = string.strip()
         if mode is True:
             if modetype == 'CLI':
-                if data == 'sw':
+                if data == 'rx':
+                    modetype = "RX"
+                    sendSerial(b'\33[2K\r')
+                    sendSerial(modetype.encode('utf8'))
+                    sendSerial(b'>')
+                    data = ""
+                elif data == 'sw':
                     modetype = "SWITCH"
                     sendSerial(b'\33[2K\r')
                     sendSerial(modetype.encode('utf8'))
@@ -121,11 +135,56 @@ while True:
                     msg = yellow("sw -> SWITCH MODE")
                     sendSerial(msg.encode('ascii'))
                     sendSerial(b'\r\n')
+                    msg = yellow("rx -> LISTEN 4 ALL LORA PACKETS")
+                    sendSerial(msg.encode('ascii'))
+                    sendSerial(b'\r\n')
                     msg = yellow("q -> QUIT TO NORMAL MODE")
                     sendSerial(msg.encode('ascii'))
                     sendSerial(b'\r\n')
                     sendSerial(modetype.encode('utf8'))
                     sendSerial(b'>')
+                    data = ""
+            elif modetype == 'RX':
+                if data == "q":
+                    modetype = "CLI"
+                    sendSerial(b'\33[2K\r')
+                    sendSerial(modetype.encode('utf8'))
+                    sendSerial(b'>')
+                    data = ""
+                elif data[:2] == 'rx':
+                    listentime = int(data[2:])
+                    sendSerial(b'\33[2K\r')
+                    msg = yellow("Waiting for LoRa packets for " + str(listentime) + " seconds ...")
+                    sendSerial(msg.encode('ascii'))
+                    sendSerial(b'\r\n')
+                    sendSerial(b'<...>')
+                    lInLED.value = False
+                    packet = "ok"
+                    while packet is not None:
+                        packet = rfm9x.receive(with_header=True,timeout=listentime)
+                        lInLED.value = True
+                        if packet is not None:
+                            sendSerial(b'\r\n')
+                            sendSerial(packet)
+                            sendSerial(b'\r\n')
+                    sendSerial(b'\r\n')
+                    msg = yellow("nothing ;(")
+                    sendSerial(msg.encode('ascii'))
+                    sendSerial(b'\r\n')
+                    modetype = "RX"
+                    sendSerial(modetype.encode('utf8'))
+                    sendSerial(b'>')
+                else:
+                    sendSerial(b'\33[2K\r')
+                    msg = yellow("rx?? -> Listen for lora packets for ?? seconds")
+                    sendSerial(msg.encode('ascii'))
+                    sendSerial(b'\r\n')
+                    msg = yellow("q -> QUIT TO NORMAL MODE")
+                    sendSerial(msg.encode('ascii'))
+                    sendSerial(b'\r\n')
+                    sendSerial(modetype.encode('utf8'))
+                    sendSerial(b'>')
+                    data = ""
             elif modetype == 'SWITCH':
                 if data is not "" and data is not "?":
                     if data == "q":
@@ -141,10 +200,12 @@ while True:
                         sendSerial(b'\r\n')
                         sendSerial(modetype.encode('utf8'))
                         sendSerial(b'>')
+                        lOutLED.value = False
                         rfm9x.send(
                             bytes("{}".format("<"), "UTF-8") + binascii.unhexlify("AA") + binascii.unhexlify("01") +
                             bytes("{}".format(data), "UTF-8")
                         )
+                        lOutLED.value = True
                 else:
                     sendSerial(b'\33[2K\r')
                     msg = yellow("example: sw0/1 -> SWITCHES sw0 port1")
