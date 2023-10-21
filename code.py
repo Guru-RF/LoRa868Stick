@@ -3,6 +3,7 @@ import time
 import busio
 import digitalio
 import usb_cdc
+import binascii
 import adafruit_rfm9x
 from digitalio import DigitalInOut, Direction, Pull
 
@@ -18,6 +19,12 @@ sOutLED = digitalio.DigitalInOut(board.GP25)
 sOutLED.direction = digitalio.Direction.OUTPUT
 sOutLED.value = True
 
+def yellow(data):
+  return "\x1b[38;5;220m" + data + "\x1b[0m"
+
+def red(data):
+  return "\x1b[1;5;31m" + data + "\x1b[0m"
+
 # our version
 print("RF.Guru\nLoRa868Stick 0.1")
 
@@ -26,13 +33,13 @@ def recvSerial():
         if serial.connected:
             if serial.in_waiting > 0:
                 sInLED.value = False
-                letter = serial.read().decode('utf-8')
+                letter = serial.read()
+                #.decode('utf-8')
                 time.sleep(0.01)
                 sInLED.value = True
                 return letter
  
 def sendSerial(data):
-    data = bytes(data, 'utf-8')
     sOutLED.value = False
     serial.write(data)
     time.sleep(0.01)
@@ -47,15 +54,109 @@ spi = busio.SPI(board.GP18, MOSI=board.GP19, MISO=board.GP16)
 rfm9x = adafruit_rfm9x.RFM9x(spi, CS, RESET, RADIO_FREQ_MHZ, baudrate=1000000, agc=False,crc=True)
 rfm9x.tx_power = 5
 
-sendSerial("RF.Guru\r\nLoRa868Stick 0.1\r\n")
+sendSerial(b"RF.Guru\r\nLoRa868Stick 0.1\r\n")
 
 string = ""
+lastdata = ""
+mode = False
+arrow = False
+modetype = "CLI"
 buf = ""
 while True:
     input = recvSerial()
     if input is not None:
-        buf = buf + input
-        sendSerial(input)
-        if input is "\r":
+        buf = buf + input.decode('utf-8')
+        if input == b'\r':
             string = buf
-            sendSerial(string)
+            buf = ""
+            sendSerial(b'\r\n')
+            if mode is True:
+                sendSerial(modetype.encode('utf8'))
+                sendSerial(b'>')
+        elif arrow is True and input == b'A':
+            sendSerial(b'\33[2K\r')
+            if mode is True:
+                sendSerial(modetype.encode('utf8'))
+                sendSerial(b'>')
+            sendSerial(lastdata.encode('utf8'))
+            buf = lastdata
+            arrow = False
+        elif input == b'[':
+            arrow = True
+        else:
+            if input == b'\x7f':
+                sendSerial(b'\33[2K\r')
+                buf = buf[:-2]
+                sendSerial(b'\r')
+                if mode is True:
+                    sendSerial(modetype.encode('utf8'))
+                    sendSerial(b'>')
+                sendSerial(buf.encode('utf8'))
+            if input == b'\x1d':
+                buf = ""
+                sendSerial(b'\33[2K\r')
+                sendSerial(modetype.encode('utf8'))
+                sendSerial(b'>')
+                mode = True
+            else: 
+                sendSerial(input)
+
+    if string is not "":
+        data = string.strip()
+        if mode is True:
+            if modetype == 'CLI':
+                if data == 'sw':
+                    modetype = "SWITCH"
+                    sendSerial(b'\33[2K\r')
+                    sendSerial(modetype.encode('utf8'))
+                    sendSerial(b'>')
+                    data = ""
+                elif data == "q":
+                    mode = False
+                    modetype = "CLI"
+                    sendSerial(b'\33[2K\r')
+                    data = ""
+                else:
+                    sendSerial(b'\33[2K\r')
+                    msg = yellow("sw -> SWITCH MODE")
+                    sendSerial(msg.encode('ascii'))
+                    sendSerial(b'\r\n')
+                    msg = yellow("q -> QUIT TO NORMAL MODE")
+                    sendSerial(msg.encode('ascii'))
+                    sendSerial(b'\r\n')
+                    sendSerial(modetype.encode('utf8'))
+                    sendSerial(b'>')
+            elif modetype == 'SWITCH':
+                if data is not "" and data is not "?":
+                    if data == "q":
+                        modetype = "CLI"
+                        sendSerial(b'\33[2K\r')
+                        sendSerial(modetype.encode('utf8'))
+                        sendSerial(b'>')
+                        data = ""
+                    else:
+                        msg = yellow("Sending in " + modetype + " mode: >" + data)
+                        sendSerial(b'\r')
+                        sendSerial(msg.encode('ascii'))
+                        sendSerial(b'\r\n')
+                        sendSerial(modetype.encode('utf8'))
+                        sendSerial(b'>')
+                        rfm9x.send(
+                            bytes("{}".format("<"), "UTF-8") + binascii.unhexlify("AA") + binascii.unhexlify("01") +
+                            bytes("{}".format(data), "UTF-8")
+                        )
+                else:
+                    sendSerial(b'\33[2K\r')
+                    msg = yellow("example: sw0/1 -> SWITCHES sw0 port1")
+                    sendSerial(msg.encode('ascii'))
+                    sendSerial(b'\r\n')
+                    msg = yellow("q -> QUIT TO NORMAL MODE")
+                    sendSerial(msg.encode('ascii'))
+                    sendSerial(b'\r\n')
+                    sendSerial(modetype.encode('utf8'))
+                    sendSerial(b'>')
+        else:
+            sendSerial(b'Unknown message !! CTRL-] Gives CLI promt.\r\n')
+
+        lastdata = data
+        string = ""
