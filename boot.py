@@ -4,7 +4,7 @@ import storage
 import supervisor
 from digitalio import DigitalInOut, Direction, Pull
 
-supervisor.set_usb_identification("RF.Guru", "SmartCW")
+supervisor.set_usb_identification("RF.Guru", "LoRaStick")
 
 usb_cdc.enable(console=True, data=True)
 
