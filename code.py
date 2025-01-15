@@ -10,6 +10,8 @@ from digitalio import DigitalInOut
 from microcontroller import watchdog as w
 from watchdog import WatchDogMode
 
+import config
+
 # configure watchdog
 w.timeout = 5
 w.mode = WatchDogMode.RESET
@@ -34,6 +36,43 @@ lOutLED.value = True
 lInLED = digitalio.DigitalInOut(board.GP13)
 lInLED.direction = digitalio.Direction.OUTPUT
 lInLED.value = True
+
+# basic encryption
+import aesio
+import os
+
+# Padding functions
+def pad_message(message, block_size=16):
+    padding = block_size - (len(message) % block_size)
+    return message + bytes([padding] * padding)
+
+# Encrypt with IV
+def encrypt_message(message, key):
+    iv = os.urandom(16)
+    padded_message = pad_message(message)
+    aes = aesio.AES(key, aesio.MODE_CBC, iv)
+    encrypted_message = bytearray(len(padded_message))
+    aes.encrypt_into(padded_message, encrypted_message)
+
+    return iv + encrypted_message
+
+# Unpadding function
+def unpad_message(message):
+    padding = message[-1]
+    return message[:-padding]
+
+# Decrypt function
+def decrypt_message(payload, key):
+    iv = payload[:16]
+    # Ensure IV length is correct
+    if len(iv) != 16:
+        raise ValueError(f"Invalid IV length: {len(iv)} (expected 16 bytes)")
+    encrypted_message = payload[16:]
+    aes = aesio.AES(key, aesio.MODE_CBC, iv)
+    decrypted_message = bytearray(len(encrypted_message))
+    aes.decrypt_into(encrypted_message, decrypted_message)
+
+    return unpad_message(decrypted_message)
 
 
 def yellow(data):
@@ -226,7 +265,7 @@ while True:
                             bytes("{}".format("<"), "UTF-8")
                             + binascii.unhexlify("AA")
                             + binascii.unhexlify("01")
-                            + bytes("{}".format(data), "UTF-8"),
+                            + encrypt_message(bytes("{}".format(data), "UTF-8"),config.key),
                         )
                         lOutLED.value = True
                 else:
@@ -252,7 +291,7 @@ while True:
                         bytes("{}".format("<"), "UTF-8")
                         + binascii.unhexlify("AA")
                         + binascii.unhexlify("01")
-                        + bytes("{}".format(data), "UTF-8"),
+                        + encrypt_message(bytes("{}".format(data), "UTF-8"),config.key),
                     )
                     lOutLED.value = True
                     sendSerial(b"#tx#done\r\n")
