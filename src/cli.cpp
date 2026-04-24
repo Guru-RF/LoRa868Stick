@@ -23,7 +23,7 @@ static void help() {
     Serial.println(F("  ls                   - list files on the drive"));
     Serial.println(F("  cat                  - print config.txt"));
     Serial.println(F("  tx <msg>             - send encrypted message"));
-    Serial.println(F("  txack <msg>          - send encrypted + wait up to 3s for ACK"));
+    Serial.println(F("  txack <msg>          - send encrypted + wait for ACK (300ms fast / 2.5s slow)"));
     Serial.println(F("  rx [sec]             - listen, decode encrypted + plaintext (default 10s)"));
     Serial.println(F("  rxtest [sec]         - dump every raw LoRa packet (no decode)"));
     Serial.println(F("  freq <MHz>           - retune LoRa"));
@@ -117,7 +117,7 @@ static void exec(String line) {
         if (arg.length() == 0) { Serial.println(F("txack: need message")); return; }
         loraSendEncrypted(arg.c_str());
         char ack[96];
-        if (loraWaitAck(3000, ack, sizeof(ack))) {
+        if (loraWaitAck(ackTimeoutMs(), ack, sizeof(ack))) {
             Serial.printf("ACK: %s\r\n", ack);
         } else {
             Serial.println(F("ACK: timeout"));

@@ -110,7 +110,7 @@ Two modes share the same serial port:
 | Command | Effect |
 |---------|--------|
 | `#tx#<msg>`      | Encrypt `<msg>` with AES-128 CBC and transmit. Replies `#tx#done`. |
-| `#txack#<msg>`   | Same as above, then hold RX open for 3 s waiting for a plaintext ACK. Replies `#txack#<ack>` or `#txack#timeout`. |
+| `#txack#<msg>`   | Same as above, then hold RX open for an ACK. Window is sized to `lora_mode`: **300 ms** in `fast`, **2.5 s** in `slow`. Replies `#txack#<ack>` or `#txack#timeout`. |
 | `#rx#<sec>`      | Listen for `<sec>` seconds. Every frame is dumped with RSSI/SNR/hex; encrypted frames are decoded when the key matches, plaintext frames (ACKs) are shown as ASCII. Replies `#rx#done`. |
 | `Ctrl+]`         | Enter interactive CLI. |
 
@@ -126,7 +126,7 @@ Prompt: `CLI> `. Type `help` for the full list. Highlights:
 | `status`            | Print config + runtime state (heap, uptime, RSSI, key) |
 | `ls` / `cat`        | Filesystem listing / print `/config.txt` |
 | `tx <msg>`          | Encrypted TX |
-| `txack <msg>`       | Encrypted TX + wait 3 s for ACK, print it |
+| `txack <msg>`       | Encrypted TX + wait for ACK (300 ms in `fast`, 2.5 s in `slow`), print it |
 | `rx [sec]`          | Listen, decode encrypted + plaintext (default 10 s) |
 | `rxtest [sec]`      | Dump every raw LoRa packet — no decode, no filter (band scanner) |
 | `freq <MHz>`        | Retune the LoRa radio live |
@@ -200,7 +200,7 @@ The *transmission* itself is not affected by CDC state. Only the ASCII trace on 
 - Two-mode serial: scriptable raw `#cmd#` interface + interactive `CLI>` shell (Ctrl+])
 - AES-128 CBC encrypted TX with freshly random IV per packet
 - `rx` mode decodes both encrypted frames and plaintext ACKs — ideal for debugging
-- `txack` transmit-and-wait-for-ACK (3-second window)
+- `txack` transmit-and-wait-for-ACK (window auto-sized to `lora_mode` — 300 ms fast / 2.5 s slow)
 - Two modem profiles: `fast` (SF7, ~50 ms airtime) and `slow` (SF12, +10 dB range)
 - USB Mass Storage drive `LORASTCK` for live config editing
 - YAML-style `config.txt` with live reload on eject

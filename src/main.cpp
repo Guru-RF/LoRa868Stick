@@ -456,6 +456,11 @@ void loraRxRaw(unsigned long timeoutMs) {
                   count, count == 1 ? "" : "s");
 }
 
+// Default ACK wait window, sized to the current modem profile.
+unsigned long ackTimeoutMs() {
+    return (config.loraMode == "slow") ? 2500UL : 300UL;
+}
+
 // Wait for a plaintext ACK (header + payload, AES decrypt fails/unused).
 // Returns true if any packet with LORA_HEADER arrives within timeoutMs.
 // Fills `ackOut` with the payload as ASCII (safe bytes only).
@@ -546,7 +551,7 @@ static void handleRawCommand(const String &cmd) {
         String msg = cmd.substring(6);
         loraSendEncrypted(msg.c_str());
         char ack[96];
-        if (loraWaitAck(3000, ack, sizeof(ack))) {
+        if (loraWaitAck(ackTimeoutMs(), ack, sizeof(ack))) {
             Serial.printf("#txack#%s\r\n", ack);
         } else {
             Serial.println("#txack#timeout");
@@ -559,7 +564,7 @@ static void handleRawCommand(const String &cmd) {
     } else {
         Serial.println("Unknown raw command. CTRL+] gives CLI prompt.");
         Serial.println("#tx#<msg>       - encrypted TX");
-        Serial.println("#txack#<msg>    - encrypted TX + wait 3s for ACK");
+        Serial.println("#txack#<msg>    - encrypted TX + wait for ACK (300ms fast / 2.5s slow)");
         Serial.println("#rx#<sec>       - listen for N seconds");
     }
 }

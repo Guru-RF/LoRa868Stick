@@ -116,9 +116,23 @@ The ACK is **not** encrypted. This is deliberate:
 
 ### 4.3 Timing
 
-The peripheral fires the ACK **immediately** after applying the command, before returning to RX. The controller must stay in RX for at least one airtime window (~80 ms in `fast` mode, ~2 s in `slow` mode) after its TX if it wants to catch the ACK.
+The peripheral fires the ACK **immediately** after applying the command, before returning to RX. The controller must stay in RX for at least one airtime window after its TX if it wants to catch the ACK.
 
-The stick's `txack` CLI command and `#txack#…` raw command handle this automatically — they TX, then hold RX open for **3 seconds** waiting for a plaintext packet with the correct framing header, then return the decoded ACK text (or `timeout`).
+For an 18-byte ACK (`<\xAA\x01ACK:sw0/3/6.0`-class payload) the round trip from "stick `endPacket()` returns" to "ACK fully received" is:
+
+| Mode | ACK airtime | Receiver process | **Total round-trip** |
+|------|-------------|------------------|----------------------|
+| **fast** | ~51 ms      | ~10–50 ms        | **~100–150 ms**      |
+| **slow** | ~1.7 s      | ~10–50 ms        | **~1.75–1.8 s**      |
+
+The stick's `txack` CLI command and `#txack#…` raw command handle this automatically — they TX, then hold RX open for a window sized to the current `lora_mode`:
+
+| Mode | `txack` wait window |
+|------|---------------------|
+| **fast** | **300 ms** (~6× ACK airtime) |
+| **slow** | **2.5 s**  (~1.5× ACK airtime) |
+
+If the window expires without a header-matching plaintext frame, the stick returns `#txack#timeout` (raw mode) or `ACK: timeout` (CLI).
 
 ---
 
@@ -163,7 +177,7 @@ Update both ends to the same value. Mismatched keys manifest on the peripheral a
 | `too short, dropped` | Packet shorter than 4 bytes; framing header can't even be checked. |
 | `header mismatch, dropped` / `no header, raw packet` | Header bytes 0..2 did not match `3C AA 01`. Another LoRa device on the band. |
 | `decrypt failed (wrong key?)` | Header matched, but AES decrypt produced invalid PKCS#7 padding. Key mismatch or sender isn't using the same protocol. |
-| `#txack#timeout` on the stick | TX succeeded but no plaintext packet returned within 3 seconds. Receiver off-air, key mismatch, or name mismatch. |
+| `#txack#timeout` on the stick | TX succeeded but no plaintext packet returned within the mode-specific window (300 ms fast / 2.5 s slow). Receiver off-air, key mismatch, or name mismatch. |
 | `#txack#ACK:…` on the stick | Happy path — peripheral applied the command and replied. |
 
 ---
